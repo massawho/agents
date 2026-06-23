@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Stage and commit git changes with a structured commit message. Use when the user wants to commit changes or save work ("commit this", "let's commit", "commit"), or after completing code changes worth saving. Never commit without loading this skill.
+description: Stage and commit git changes with a structured commit message. Use when the user wants to commit or save work ("commit this", "let's commit", "save my work"), amend or fix a recent commit (typo, drop an unrelated file, keep it atomic), or after finishing code changes worth saving. Not for pushing — the user pushes manually. Never commit without loading this skill.
 ---
 
 # Git Commit
@@ -107,6 +107,17 @@ via the admin panel.
 
 https://linear.app/team/issues/PROJ-42
 ```
+
+## Amending
+
+To fix the most recent commit (message typo, an unrelated file that slipped
+in, or to keep it atomic), amend instead of stacking a follow-up commit:
+- Message only: rewrite the message file, then `git commit --amend -F <path>`.
+- Wrong files: correct the staged set (`git restore --staged <file>`), then
+  `git commit --amend -F <path>`.
+
+Re-check the Format rules on the amended message. Only amend commits you have
+not pushed.
 
 ## Cross-repo commits
 
