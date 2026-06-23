@@ -1,91 +1,76 @@
 ---
 name: git-commit
-description: Stage and commit git changes following a structured commit message workflow. Use when the user wants to commit changes, save their work, or says things like "commit this", "commit these changes", "let's commit", or simply "commit". Also activates when completing a task that produced code changes worth saving. Never commit without loading this skill.
+description: Stage and commit git changes with a structured commit message. Use when the user wants to commit changes or save work ("commit this", "let's commit", "commit"), or after completing code changes worth saving. Never commit without loading this skill.
 ---
 
-# Git Commit Workflow
+# Git Commit
 
-Stage relevant changes and write a commit message that answers three questions:
-why this change was necessary, how it addresses the issue, and what side effects
-it has.
+A good commit message answers three questions: **why** the change was
+necessary, **how** it addresses the issue, and **what** side effects it has.
+Work the steps in order; the Format section is the single source of truth for
+every rule.
 
-## Commit Message Structure
+## Steps
 
-**Title** (required): ≤50 characters, capitalized, imperative verb ("Add",
-"Fix", "Remove", "Drop"), no period. Followed by a blank line.
+1. **Scope the stage.** Run `git status` and `git diff`. Stage only files
+   within the task's scope — confirm nothing unrelated is included.
 
-**Problem paragraph** (required): 1–2 sentences on what was broken, missing,
-or painful before this change. This tells reviewers what to expect.
+2. **Write the message to a file.** Resolve the git directory, which works in
+   normal repos and worktrees alike:
+   ```bash
+   git rev-parse --absolute-git-dir
+   ```
+   Compose the message per the Format below and write it with the Write tool
+   to `<that path>/COMMIT_EDITMSG`. This file always exists, is never tracked,
+   and needs no cleanup. Never invent a `.tmp/` path.
 
-**Solution paragraph** (required unless the change is obvious): what was done
-to address it. Always open with a prose sentence. If the change has multiple
-distinct parts, follow it with a bullet list — bullets give a faster, more
-objective read than a long paragraph. If the change is a single cohesive
-thing, prose alone is fine.
+3. **Verify, then commit.** Before committing, confirm every rule in Format
+   holds — title ≤50 chars, body wrapped at 72, blank lines between
+   paragraphs, no em dashes. Then commit from the file:
+   ```bash
+   git commit -F <that path>/COMMIT_EDITMSG
+   ```
+   Do NOT use `git commit -m` — agents mis-wrap multi-line messages inside
+   shell quoting. Always commit from the file.
 
-**Side effects paragraph** (optional): breaking changes, migration notes,
-behavior changes consumers must know about, or intentional omissions. Use
-this paragraph to be honest about scope. A long list is fine when the commit
-is genuinely atomic — all changes serve a single purpose. The warning sign
-is unrelated items appearing here, not the count.
+   A `PreToolUse` guard (`scripts/commit-guard.sh`) runs on this commit and
+   may block it: it re-checks the message format and runs the project's
+   detected checks (format, lint, type, test). If it blocks, fix exactly what
+   it reports — for a formatter failure, run the fixer and re-stage — then
+   commit again. Do not bypass it with `--no-verify`.
+
+4. **Report.** Tell the user the commit title. Do not push; wait for the user
+   to confirm. Never add `Co-Authored-By: Claude` or any AI-assisted note.
+
+## Format
+
+**Title** (required): ≤50 characters, capitalized, imperative verb (Add, Fix,
+Remove, Drop), no trailing period. Blank line after.
+
+**Problem** (required): 1–2 sentences on what was broken, missing, or painful
+before this change.
+
+**Solution** (required unless the change is obvious): always open with a prose
+sentence on what was done. If the change has multiple distinct parts, follow
+with a bullet list; if it is a single cohesive thing, prose alone is fine.
+
+**Side effects** (optional): breaking changes, migration notes, behavior
+changes consumers must know about, or intentional omissions. A long list is
+fine when the commit is genuinely atomic (all changes serve a single purpose);
+the warning sign is unrelated items, not the count.
 
 **Trailing references** (optional): ticket/card URL and/or a link to the spec
-or plan that drove the change. Each on its own line at the end.
+or plan that drove the change, each on its own line at the end.
 
-### Format rules
-
-- Body lines wrap at 72 characters.
-- Blank line between every paragraph.
+Mechanical rules:
+- Body lines wrap at 72 characters; blank line between every paragraph.
 - Bullets use a hyphen and single space: `- item`.
 - No em dashes (`—`) or double hyphens (`--`). Use commas, parentheses, or
-  separate sentences instead.
+  separate sentences.
 
 ## Examples
 
-### Feature with bullet solution
-
-```
-Add nightly report delivery via email
-
-The reporting module had no scheduled delivery mechanism, requiring
-users to log in and export reports manually each morning.
-
-This change introduces a background job that:
-- Queries active subscriptions and their configured report filters.
-- Renders each report as a PDF attachment.
-- Delivers it via the existing mailer with a retry policy of 3
-  attempts before marking the job as failed.
-
-Jobs are enqueued at 06:00 UTC by default. The schedule is
-configurable per tenant via the admin panel.
-
-https://linear.app/team/issues/PROJ-42
-```
-
-### Larger refactor with side effects
-
-```
-Migrate authentication from session cookies to JWT
-
-The cookie-based session store was incompatible with the new mobile
-client, which cannot share cookies across subdomains.
-
-This change replaces the session-based auth middleware with a JWT
-pipeline using short-lived access tokens and rotating refresh tokens.
-It updates all protected routes to verify the token from the
-Authorization header and removes the legacy session plug.
-
-- Add TokenStore context with issue/verify/revoke functions
-- Replace SessionPlug with JWTPlug across the router
-- Update login and logout controllers for token exchange flow
-- Remove session migration helper introduced in v1.3
-
-Existing sessions are invalidated on deploy. Users will need to log
-in again. The mobile client must send `Authorization: Bearer <token>`
-on all authenticated requests.
-```
-
-### Bug fix with prose solution
+Bug fix, prose solution with a side effect:
 
 ```
 Fix double-charge on network timeout during checkout
@@ -96,78 +81,61 @@ the same order. This affected roughly 1 in 8,000 transactions.
 
 This change generates a stable idempotency key from the order ID
 before calling the payment provider and passes it on every attempt.
-It also stores the provider's response against the key so retries
-return the cached result instead of making a new charge.
+It also caches the provider's response so retries return the cached
+result instead of making a new charge.
 
 The fix requires a one-time backfill to populate keys for orders
 created in the past 30 days.
 ```
 
-### Refactor with multiple parts
+Feature, bullet solution with a trailing reference:
 
 ```
-Extract pagination logic into shared helper
+Add nightly report delivery via email
 
-Pagination was implemented identically across the orders, products,
-and invoices controllers. Any change to the default page size, the
-per-page cap, or the response shape required updating three places,
-and they had already drifted slightly.
+The reporting module had no scheduled delivery mechanism, requiring
+users to log in and export reports manually each morning.
 
-This change introduces lib/pagination.py with a single paginate
-function that accepts a SQLAlchemy query and the request object.
+This change introduces a background job that:
+- Queries active subscriptions and their configured report filters.
+- Renders each report as a PDF attachment.
+- Delivers it via the existing mailer, retrying 3 times before
+  marking the job as failed.
 
-- Replace the nine-line inline block in each list controller
-- Cap per-page at 100 via the helper rather than per-controller
+Jobs are enqueued at 06:00 UTC by default, configurable per tenant
+via the admin panel.
+
+https://linear.app/team/issues/PROJ-42
 ```
 
-### Simple single-change refactor
+## Cross-repo commits
 
-```
-Extract rate limiting into a dedicated plug
-
-Rate limiting logic was duplicated across three controllers with
-slightly different thresholds, making it easy to miss when updating
-limits or adding new endpoints.
-
-This commit extracts the logic into RateLimiter.Plug and wires it
-into the router pipeline. The per-route thresholds are unchanged.
-```
-
-## Cross-Repo Commits
-
-When committing in a repo that is NOT the current working directory,
-use `git -C <path>` to stay in place:
+When committing in a repo that is NOT the current working directory, use
+`git -C <path>` for every git call, including the path resolution:
 
 ```bash
-# Good
+# Good — resolve and commit inside <path>
 git -C ~/.dotfiles add ai/skills/git-commit/
-git -C ~/.dotfiles commit -m "..."
+git -C ~/.dotfiles rev-parse --absolute-git-dir   # -> message file location
+git -C ~/.dotfiles commit -F <that path>/COMMIT_EDITMSG
 
-# Bad — triggers permission prompts
+# Bad — cd triggers permission prompts
 cd ~/.dotfiles && git commit -m "..."
 ```
 
-## Committing via Terminal
+## The commit guard
 
-Pass each paragraph as a separate `-m` flag:
+`scripts/commit-guard.sh` is a Claude Code `PreToolUse` hook that fires only
+on the agent's commits (never the user's own terminal commits). It validates
+the message format and runs the project's checks in check mode, blocking the
+commit on any failure. It auto-detects Elixir, Node, Rust, Python, and Go, and
+defers to an existing pre-commit framework (Husky, lefthook, `pre-commit`).
 
-```bash
-git commit \
-  -m "Title here" \
-  -m "Problem paragraph." \
-  -m "Solution paragraph." \
-  -m "Side effects paragraph."
-```
-
-Or use `$'...'` syntax for inline newlines in zsh/bash:
+To adapt a project — most importantly to run checks inside a container — drop
+a `.commit-guard.sh` at the repo root. See `scripts/commit-guard.example.sh`
+for every knob; the common one is `RUNNER`:
 
 ```bash
-git commit -m $'Title here\n\nProblem.\n\nSolution.'
+# .commit-guard.sh
+RUNNER="docker compose exec -T app"
 ```
-
-## After Committing
-
-- Tell the user what the commit title was.
-- Do not push. Wait for the user to confirm before pushing.
-- Do not include `Co-Authored-By: Claude` or any indication that AI
-  assisted in writing the commit or message.
