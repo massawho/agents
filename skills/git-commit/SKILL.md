@@ -48,11 +48,12 @@ every rule.
 Remove, Drop), no trailing period. Blank line after.
 
 **Problem** (required): 1–2 sentences on what was broken, missing, or painful
-before this change.
+before this change. Keep it tweet size: 240 characters maximum.
 
 **Solution** (required unless the change is obvious): always open with a prose
 sentence on what was done. If the change has multiple distinct parts, follow
 with a bullet list; if it is a single cohesive thing, prose alone is fine.
+Keep it the size of a tweet: 240 characters maximum.
 
 **Side effects** (optional): breaking changes, migration notes, behavior
 changes consumers must know about, or intentional omissions. A long list is
@@ -67,6 +68,8 @@ Mechanical rules:
 - Bullets use a hyphen and single space: `- item`.
 - No em dashes (`—`) or double hyphens (`--`). Use commas, parentheses, or
   separate sentences.
+- Keep it short, descriptive and easy to read.. Maximum of half a tweet size
+  (120 characters).
 
 ## Examples
 
