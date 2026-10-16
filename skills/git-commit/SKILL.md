@@ -1,6 +1,8 @@
 ---
 name: git-commit
 description: Stage and commit git changes with a structured commit message. Use when the user wants to commit or save work ("commit this", "let's commit", "save my work"), amend or fix a recent commit (typo, drop an unrelated file, keep it atomic), or after finishing code changes worth saving. Not for pushing — the user pushes manually. Never commit without loading this skill.
+model: sonnet
+effort: medium
 ---
 
 # Git Commit
@@ -13,7 +15,14 @@ every rule.
 ## Steps
 
 1. **Scope the stage.** Run `git status` and `git diff`. Stage only files
-   within the task's scope — confirm nothing unrelated is included.
+   within the task's scope — confirm nothing unrelated is included. Stage in
+   its **own** tool call, never chained into the commit (`git add … && git
+   commit …`): the guard runs before the whole command, so it would see an
+   empty index, skip its auto-fixes and run every check even on a docs-only
+   commit.
+
+   Do not run the project's formatter, linter or tests yourself before
+   committing. The guard does it (step 3).
 
 2. **Write the message to a file.** Resolve the git directory, which works in
    normal repos and worktrees alike:
@@ -34,13 +43,14 @@ every rule.
    shell quoting. Always commit from the file.
 
    A `PreToolUse` guard (`scripts/commit-guard.sh`) runs on this commit and
-   may block it: it re-checks the message format and runs the project's
-   detected checks (format, lint, type, test). If it blocks, fix exactly what
-   it reports — for a formatter failure, run the fixer and re-stage — then
+   may block it: it re-checks the message format, auto-fixes the staged files
+   where the project configures fixers (formatter, `lint --fix`) and re-stages
+   them, then runs the project's checks (format, lint, type, test). If it
+   blocks, fix only what it reports (what no fixer could), re-stage and
    commit again. Do not bypass it with `--no-verify`.
 
 4. **Report.** Tell the user the commit title. Do not push; wait for the user
-   to confirm. Never add `Co-Authored-By: Claude` or any AI-assisted note.
+   to confirm.
 
 ## Format
 
@@ -145,11 +155,30 @@ the message format and runs the project's checks in check mode, blocking the
 commit on any failure. It auto-detects Elixir, Node, Rust, Python, and Go, and
 defers to an existing pre-commit framework (Husky, lefthook, `pre-commit`).
 
-To adapt a project — most importantly to run checks inside a container — drop
-a `.commit-guard.sh` at the repo root. See `scripts/commit-guard.example.sh`
-for every knob; the common one is `RUNNER`:
+It is the project's single pre-commit validation: workflows must not repeat
+its checks by hand before committing. What it does per commit:
+- **Auto-fix** (`FIXERS`): runs the formatter / `lint --fix` on the commit's
+  files and re-stages them, so no turn is spent on what a tool can fix. A
+  file with both staged and unstaged edits is left alone.
+- **One runner call**: fixers and every check run in a single `sh -c`
+  through `RUNNER`, so a container boots once per commit.
+- **Non-code skip** (`NON_CODE_PATHS`): a commit touching only those paths
+  (docs, specs, the guard config) runs the message check only. An amend is
+  judged by the amended commit's files plus what is staged.
+
+To adapt a project, drop a `.commit-guard.sh` at the repo root. See
+`scripts/commit-guard.example.sh` for every knob. A typical container setup
+reuses the dev container only when it mounts THIS checkout (worktrees may
+share a compose project name) and otherwise starts a one-off one:
 
 ```bash
 # .commit-guard.sh
-RUNNER="docker compose exec -T app"
+cid="$(docker compose ps -q --status running app 2>/dev/null | head -n1)"
+if [ -n "$cid" ] && [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$cid")" = "$PWD" ]; then
+  RUNNER="docker compose exec -T app"
+else
+  RUNNER="docker compose run --rm app"
+fi
+FIXERS=("prettier|.|npx prettier --write --ignore-unknown")
+NON_CODE_PATHS="*.md docs/* .commit-guard.sh"
 ```

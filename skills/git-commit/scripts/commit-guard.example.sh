@@ -16,6 +16,21 @@
 # Run only the message-format check, no project checks at all.
 # SKIP_SANITIZE=1
 
+# Skip the project checks (the message check still runs) when every file the
+# commit touches matches one of these globs. `*` crosses directories, so
+# "openspec/*" covers the whole tree. Any path outside them counts as code.
+# NON_CODE_PATHS="*.md openspec/* docs/* .commit-guard.sh"
+
+# Auto-fix before checking. Each entry is "name|path-regex|command" (the
+# regex may contain "|"; the command must not); the
+# command gets the commit's files matching the regex appended, runs through
+# RUNNER, and the files are re-staged. Runs in order (put the formatter last).
+# A file that also has unstaged edits is skipped, never re-staged.
+# FIXERS=(
+#   "eslint|^src/.*\.(ts|tsx)$|yarn eslint --fix --no-warn-ignored"
+#   "prettier|.|yarn prettier --write --ignore-unknown"
+# )
+
 # Replace auto-detection entirely. Each entry is "name|command" and is run
 # through RUNNER like the detected ones. Use this for monorepos or anything
 # the sniffer gets wrong.
