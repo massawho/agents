@@ -109,12 +109,17 @@ commit_files() {
 non_code_only() {
   [ -n "$NON_CODE_PATHS" ] || return 1
   local files f pat hit
+  local -a pats
+  # `read -a` splits without pathname expansion: an unquoted
+  # `for pat in $NON_CODE_PATHS` expands `openspec/*` against the checkout
+  # into its top-level entries, which then miss every deeper path.
+  read -r -a pats <<<"$NON_CODE_PATHS"
   files="$(commit_files)"
   [ -n "${files//[[:space:]]/}" ] || return 1
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     hit=0
-    for pat in $NON_CODE_PATHS; do
+    for pat in "${pats[@]}"; do
       # shellcheck disable=SC2053
       [[ "$f" == $pat ]] && { hit=1; break; }
     done
